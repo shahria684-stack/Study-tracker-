@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Study Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#f6f7fb;--c:#fff;--t:#1b1f2a;--m:#6b7280;--a:#4f46e5;--g:#16a34a;--r:#dc2626;--b:#e5e7eb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1117;--c:#191c25;--t:#eceef4;--m:#9aa1b2;--b:#2a2e3a;--a:#818cf8}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--t);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:70px}
+main{max-width:560px;margin:auto;padding:14px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{margin:0 0 8px;font-size:17px}.m{color:var(--m);font-size:13px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--c);border-top:1px solid var(--b);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;background:none;color:var(--m);padding:12px 2px;font-size:13px}nav button.on{color:var(--a);font-weight:700}
+.clock{font-size:44px;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0}
+.btn{width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;color:#fff;background:var(--a);font-weight:600}
+.btn.g{background:var(--g)}.btn.r{background:var(--r)}.btn.s{width:auto;padding:8px 12px;font-size:14px}
+input,select{width:100%;padding:11px;border:1px solid var(--b);border-radius:10px;background:var(--bg);color:var(--t);font-size:16px;margin:4px 0}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.bars{display:flex;gap:6px;align-items:flex-end;height:130px;margin-top:8px}
+.bars div{flex:1;text-align:center;font-size:11px;color:var(--m)}.bars i{display:block;background:var(--a);border-radius:6px 6px 0 0;min-height:2px}
+.stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--b)}.stat:last-child{border:0}
+.up{color:var(--g)}.dn{color:var(--r)}
+.x{float:right;background:none;border:0;color:var(--r);font-size:16px}
+.prog{height:12px;background:var(--b);border-radius:8px;overflow:hidden}.prog i{display:block;height:100%;background:var(--g)}
+textarea{width:100%;height:80px;padding:8px;border:1px solid var(--b);border-radius:10px;background:var(--bg);color:var(--t);font-size:12px}
+.q{border-left:4px solid var(--a)}.q p{margin:6px 0 0;font-size:17px;font-style:italic}
+</style></head><body><main id="v"></main>
+<nav id="n"></nav>
+<script>
+var D=null;try{D=JSON.parse(localStorage.getItem('st'))}catch(e){}
+D=D||{study:[],sleep:[],exams:[],social:{},act:{}};D.goal=D.goal||120;
+function save(){try{localStorage.setItem('st',JSON.stringify(D))}catch(e){}}
+var tab='today',wk=0,wl=null;
+var $=function(s){return document.querySelector(s)};
+var pad=function(n){return String(n).padStart(2,'0')};
+function key(t){var d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function fmt(ms){var m=Math.round(ms/60000);return Math.floor(m/60)+'h '+(m%60)+'m'}
+function hms(ms){var s=Math.max(0,Math.floor(ms/1000));return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60)}
+function sum(a,f){return a.reduce(function(x,y){return x+f(y)},0)}
+function studyOn(k){return sum(D.study.filter(function(x){return key(x.s)==k}),function(x){return x.e-x.s})}
+function sleepOn(k){return sum(D.sleep.filter(function(x){return key(x.e)==k}),function(x){return x.e-x.s})}
+function pct(x){return x.m/x.t*100}
+var Q=["Small hours, repeated daily, build big results.","Today's effort is tomorrow's confidence.","You don't need to be perfect, just consistent.","Every chapter finished is one worry less.","Discipline beats motivation when motivation fades.","Your future self is watching what you do now.","Hard work stays with you; excuses only delay you.","One more MCQ, one more step closer.","Don't count the days, make the days count.","Struggle today is the strength of exam day.","Start where you are, use what you have, do what you can.","Tired is temporary, regret lasts longer.","Focus for one hour is worth more than distraction all day.","Dreams need a timetable to become plans.","Mistakes in practice are lessons you won't repeat in the exam.","The seat you want is earned one page at a time.","Be proud of progress, not only results.","Hard days build the toughest students.","Say no to the scroll, yes to your goal.","Revise today what you will thank yourself for later.","Success is quiet work done when no one is watching.","A slow day is still better than a skipped day.","Your parents' hope is a reason; your own dream is the fuel.","Push through this chapter, the next will feel easier.","Sleep well, study well, repeat.","Stay patient; roots grow before the tree shows.","You have already come too far to stop now.","Make today's study session better than yesterday's.","Believe in your preparation, then trust yourself.","The finish line belongs to those who keep walking."];
+function quoteCard(){var d=new Date().getDate();return '<div class="card q"><span class="m">Motivation · day '+(((d-1)%30)+1)+'</span><p>'+Q[(d-1)%30]+'</p></div>'}
+function goalCard(k){var dn=studyOn(k)+(D.act.study?Date.now()-D.act.study.s:0),g=D.goal*60000,p=Math.min(100,dn/g*100);
+ return '<div class="card"><h2>Daily study goal</h2><div class="prog"><i style="width:'+p+'%"></i></div><p class="m">'+fmt(dn)+' of '+fmt(g)+(dn>=g?' · goal reached ✓':'')+'</p><div class="row"><input id="goal" type="number" inputmode="numeric" value="'+D.goal+'" placeholder="minutes"><button class="btn s" onclick="setGoal()">Set goal (min)</button></div></div>'}
+function setGoal(){var v=parseInt($('#goal').value);if(v>0){D.goal=v;save();render()}}
+function subList(){var s={};D.study.forEach(function(x){if(x.sub)s[x.sub]=1});return Object.keys(s).map(function(x){return '<option value="'+x+'">'}).join('')}
+function weekCards(w){
+ var ks=w.days.map(function(d){return d.k}),g={},tot=0;
+ D.study.forEach(function(x){if(ks.indexOf(key(x.s))>-1){var n=x.sub||'Unlabeled';g[n]=(g[n]||0)+x.e-x.s;tot+=x.e-x.s}});
+ var names=Object.keys(g).sort(function(a,b){return g[b]-g[a]});
+ var hit=w.st.filter(function(x){return x>=D.goal*60000}).length;
+ var h='<div class="card"><h2>Study by subject</h2>'+(names.length?names.map(function(n){var p=Math.round(g[n]/tot*100);return '<div style="margin:8px 0"><div class="stat" style="border:0;padding:0"><span>'+n+'</span><b>'+fmt(g[n])+' · '+p+'%</b></div><div class="prog"><i style="width:'+p+'%;background:var(--a)"></i></div></div>'}).join(''):'<p class="m">No sessions this week.</p>')+'</div>';
+ return h+'<div class="card"><h2>Goal days</h2><p style="margin:0">You met your '+fmt(D.goal*60000)+' goal on <b>'+hit+' of 7</b> days.</p></div>'}
+function backupCard(){return '<div class="card"><h2>Backup</h2><p class="m">Show backup, copy the text and keep it safe (e.g. in Notes). To restore, paste it here and press Restore.</p><textarea id="bk"></textarea><div class="row"><button class="btn s" onclick="showBk()">Show backup</button><button class="btn s r" onclick="restoreBk()">Restore</button></div></div>'}
+function showBk(){var t=$('#bk');t.value=JSON.stringify(D);t.select();try{navigator.clipboard.writeText(t.value)}catch(e){}}
+function restoreBk(){try{var o=JSON.parse($('#bk').value);if(o&&o.study&&o.sleep&&o.exams){D=o;D.goal=D.goal||120;D.act=D.act||{};D.social=D.social||{};save();render()}}catch(e){}}
+var tabs=[['today','Today'],['study','Study'],['sleep','Sleep'],['exams','Exams'],['report','Report']];
+function nav(){$('#n').innerHTML=tabs.map(function(t){return '<button class="'+(t[0]==tab?'on':'')+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>'}).join('')}
+function go(t){tab=t;render()}
+document.addEventListener('visibilitychange',function(){
+ var a=D.act.study;if(!a)return;
+ if(document.hidden){a.h=Date.now()}else if(a.h){a.n=(a.n||0)+1;a.lt=(a.lt||0)+Date.now()-a.h;a.h=null}
+ save()});
+function startMode(m){
+ if(m=='study'){D.act.study={s:Date.now(),sub:($('#sub')||{}).value||''};
+  try{document.documentElement.requestFullscreen()}catch(e){}
+  try{navigator.wakeLock.request('screen').then(function(l){wl=l}).catch(function(){})}catch(e){}}
+ else D.act.sleep={s:Date.now()};
+ save();render()}
+function stopMode(m){
+ var a=D.act[m];if(!a)return;a.e=Date.now();
+ if(a.h){a.lt=(a.lt||0)+a.e-a.h;a.n=(a.n||0)+1}delete a.h;
+ D[m].push(a);delete D.act[m];save();
+ try{if(document.fullscreenElement)document.exitFullscreen();if(wl)wl.release()}catch(e){}
+ render()}
+function setSocial(){var v=parseInt($('#soc').value);if(isNaN(v))return;D.social[key(Date.now())]=v;save();render()}
+function addExam(){
+ var m=parseFloat($('#em').value),t=parseFloat($('#et').value);
+ if(isNaN(m)||isNaN(t)||t<=0)return;
+ D.exams.push({d:$('#ed').value||key(Date.now()),type:$('#ety').value,sub:$('#esub').value||'-',m:m,t:t});save();render()}
+function delExam(i){D.exams.splice(i,1);save();render()}
+function delSes(m,i){D[m].splice(i,1);save();render()}
+function modeCard(m,label,verb){
+ var a=D.act[m];
+ if(a)return '<div class="card"><h2>'+label+' is ON</h2><div class="clock" id="clk" data-m="'+m+'">'+hms(Date.now()-a.s)+'</div>'+
+  (m=='study'?'<p class="m" style="text-align:center">Time away from this page: '+(a.n||0)+' times, '+fmt(a.lt||0)+'</p>':'')+
+  '<button class="btn r" onclick="stopMode(\''+m+'\')">'+(m=='study'?'Stop studying':'I woke up')+'</button></div>';
+ return '<div class="card"><h2>'+label+'</h2>'+(m=='study'?'<input id="sub" list="subs" placeholder="Subject / chapter (optional)"><datalist id="subs">'+subList()+'</datalist>':'')+
+  '<button class="btn '+(m=='study'?'':'g')+'" onclick="startMode(\''+m+'\')">'+verb+'</button></div>'}
+function list(m){
+ var h='';D[m].slice(-8).reverse().forEach(function(x){var i=D[m].indexOf(x);
+  h+='<div class="stat"><span>'+key(x.s)+' '+pad(new Date(x.s).getHours())+':'+pad(new Date(x.s).getMinutes())+(x.sub?' · '+x.sub:'')+'</span><span>'+fmt(x.e-x.s)+' <button class="x" onclick="delSes(\''+m+'\','+i+')">×</button></span></div>'});
+ return h||'<p class="m">No sessions yet.</p>'}
+function weekDays(off){
+ var d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+1)%7)+off*7);
+ var r=[];for(var i=0;i<7;i++){var x=new Date(d);x.setDate(d.getDate()+i);r.push({k:key(x),n:['Sat','Sun','Mon','Tue','Wed','Thu','Fri'][i]})}return r}
+function wstats(off){
+ var days=weekDays(off),st=days.map(function(d){return studyOn(d.k)}),sl=days.map(function(d){return sleepOn(d.k)});
+ var so=days.map(function(d){return D.social[d.k]||0}),ks=days.map(function(d){return d.k});
+ var ex=D.exams.filter(function(e){return ks.indexOf(e.d)>-1});
+ var sd=sl.filter(function(x){return x>0}).length,xd=days.filter(function(d){return D.social[d.k]!=null}).length;
+ return{days:days,st:st,sl:sl,so:so,ex:ex,tot:sum(st,function(x){return x}),slAvg:sd?sum(sl,function(x){return x})/sd:0,
+  soTot:sum(so,function(x){return x}),exAvg:ex.length?sum(ex,pct)/ex.length:null,best:st.indexOf(Math.max.apply(null,st))}}
+function render(){
+ nav();var h='',k=key(Date.now());
+ if(tab=='today'){
+  var ex=D.exams.filter(function(e){return e.d==k});
+  h=quoteCard()+goalCard(k)+'<div class="card"><h2>Today</h2><div class="stat"><span>Study</span><b>'+fmt(studyOn(k)+(D.act.study?Date.now()-D.act.study.s:0))+'</b></div>'+
+  '<div class="stat"><span>Sleep (woke today)</span><b>'+fmt(sleepOn(k))+'</b></div>'+
+  '<div class="stat"><span>Social media</span><b>'+(D.social[k]!=null?D.social[k]+' min':'not entered')+'</b></div>'+
+  '<div class="stat"><span>Exams today</span><b>'+(ex.length?ex.map(function(e){return Math.round(pct(e))+'%'}).join(', '):'none')+'</b></div></div>'+
+  '<div class="card"><h2>Social media today (minutes)</h2><p class="m">Open Digital Wellbeing on your phone and type the number here.</p><div class="row"><input id="soc" type="number" inputmode="numeric" placeholder="minutes" value="'+(D.social[k]!=null?D.social[k]:'')+'"><button class="btn s" onclick="setSocial()">Save</button></div></div>'+
+  (D.act.study?'<div class="card"><b>Study mode is running.</b></div>':'')+(D.act.sleep?'<div class="card"><b>Sleep mode is running.</b></div>':'');
+ }else if(tab=='study'){h=modeCard('study','Study mode','Start studying')+'<div class="card"><h2>Recent sessions</h2>'+list('study')+'</div>';
+ }else if(tab=='sleep'){h=modeCard('sleep','Sleep mode','Going to sleep')+'<div class="card"><h2>Recent sleep</h2>'+list('sleep')+'</div>';
+ }else if(tab=='exams'){
+  h='<div class="card"><h2>Add exam result</h2><select id="ety"><option>Daily</option><option>Weekly</option><option>Model test</option></select><input id="esub" placeholder="Subject"><input id="ed" type="date" value="'+k+'"><div class="row"><input id="em" type="number" step="any" placeholder="Marks"><input id="et" type="number" step="any" placeholder="Out of"></div><button class="btn" onclick="addExam()">Save result</button></div><div class="card"><h2>Results</h2>';
+  var any=0;for(var i=D.exams.length-1;i>=0&&any<15;i--,any++){var e=D.exams[i];h+='<div class="stat"><span>'+e.d+' · '+e.type+' · '+e.sub+'</span><span>'+e.m+'/'+e.t+' ('+Math.round(pct(e))+'%) <button class="x" onclick="delExam('+i+')">×</button></span></div>'}
+  h+=any?'':'<p class="m">No results yet.</p>';h+='</div>';
+ }else{
+  var w=wstats(wk),p=wstats(wk-1),mx=Math.max.apply(null,w.st.concat([3600000]));
+  var dl=p.tot?Math.round((w.tot-p.tot)/p.tot*100):null,foc=(w.tot+w.soTot*60000)?Math.round(w.tot/(w.tot+w.soTot*60000)*100):null;
+  var tips=[];
+  if(w.tot==0)tips.push('No study logged this week yet.');
+  else{tips.push('Best day: '+w.days[w.best].n+' ('+fmt(w.st[w.best])+').');
+   if(dl!=null)tips.push(dl>=0?'Study time is up '+dl+'% vs last week.':'Study time is down '+Math.abs(dl)+'% vs last week.')}
+  if(w.slAvg&&w.slAvg<6*3600000)tips.push('Average sleep is under 6h; this can hurt memory and exam scores.');
+  if(foc!=null&&foc<50)tips.push('Social media took more time than study this week.');
+  if(w.exAvg!=null&&p.exAvg!=null)tips.push('Exam average '+(w.exAvg>=p.exAvg?'improved':'dropped')+' from '+Math.round(p.exAvg)+'% to '+Math.round(w.exAvg)+'%.');
+  h='<div class="card"><div class="row"><button class="btn s" onclick="wk--;render()">‹ Prev</button><b style="text-align:center;align-self:center">'+w.days[0].k.slice(5)+' → '+w.days[6].k.slice(5)+'</b><button class="btn s" onclick="if(wk<0){wk++;render()}">Next ›</button></div></div>'+
+  '<div class="card"><h2>Study per day</h2><div class="bars">'+w.days.map(function(d,i){return '<div><span>'+(w.st[i]?(w.st[i]/3600000).toFixed(1):'')+'</span><i style="height:'+Math.round(w.st[i]/mx*100)+'px"></i>'+d.n+'</div>'}).join('')+'</div></div>'+
+  '<div class="card"><h2>Week summary</h2><div class="stat"><span>Total study</span><b>'+fmt(w.tot)+(dl!=null?' <span class="'+(dl>=0?'up':'dn')+'">'+(dl>=0?'▲':'▼')+Math.abs(dl)+'%</span>':'')+'</b></div>'+
+  '<div class="stat"><span>Daily average</span><b>'+fmt(w.tot/7)+'</b></div><div class="stat"><span>Average sleep</span><b>'+fmt(w.slAvg)+'</b></div>'+
+  '<div class="stat"><span>Social media</span><b>'+fmt(w.soTot*60000)+'</b></div><div class="stat"><span>Focus score (study vs social)</span><b>'+(foc!=null?foc+'%':'-')+'</b></div>'+
+  '<div class="stat"><span>Exam average ('+w.ex.length+')</span><b>'+(w.exAvg!=null?Math.round(w.exAvg)+'%':'-')+'</b></div></div>'+
+  weekCards(w)+'<div class="card"><h2>Insights</h2>'+tips.map(function(t){return '<p style="margin:6px 0">• '+t+'</p>'}).join('')+'</div>';
+ }
+ $('#v').innerHTML=h}
+setInterval(function(){var c=$('#clk');if(c){var a=D.act[c.dataset.m];if(a)c.textContent=hms(Date.now()-a.s)}},1000);
+render();
+</script></body></html>
